@@ -31,6 +31,95 @@
         position: relative;
         width: 100%;
         height: 100%;
+        overflow: hidden;
+        background:
+          radial-gradient(
+            circle at top,
+            rgba(255, 255, 255, 0.08),
+            transparent 35%
+          ),
+          linear-gradient(180deg, #1f1f1f 0%, #121212 45%, #090909 100%);
+      }
+
+      #tubeRig {
+        position: absolute;
+        left: 50%;
+        top: 20px;
+        bottom: 20px;
+        width: 188px;
+        margin-left: -94px;
+        transform-origin: 50% 50%;
+        will-change: transform;
+      }
+
+      #tube {
+        position: absolute;
+        left: 50%;
+        top: 0;
+        bottom: 0;
+        width: 164px;
+        margin-left: -82px;
+        border-radius: 999px;
+        border: 3px solid rgba(225, 232, 240, 0.42);
+        background:
+          linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.18),
+            rgba(255, 255, 255, 0.03) 25%,
+            rgba(255, 255, 255, 0.13) 52%,
+            rgba(255, 255, 255, 0.04) 72%,
+            rgba(255, 255, 255, 0.16)
+          ),
+          linear-gradient(
+            180deg,
+            rgba(55, 66, 83, 0.45),
+            rgba(24, 31, 40, 0.18)
+          );
+        box-shadow:
+          inset 0 0 26px rgba(255, 255, 255, 0.06),
+          inset 0 0 45px rgba(0, 0, 0, 0.42),
+          0 20px 55px rgba(0, 0, 0, 0.45);
+        pointer-events: none;
+      }
+
+      #tube::before,
+      #tube::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        width: 188px;
+        height: 24px;
+        margin-left: -94px;
+        border-radius: 999px;
+        background: linear-gradient(180deg, #d4d8de, #7f8a96);
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+      }
+
+      #tube::before {
+        top: -10px;
+      }
+
+      #tube::after {
+        bottom: -10px;
+      }
+
+      #tubeHint {
+        position: absolute;
+        left: 50%;
+        bottom: 26px;
+        transform: translateX(-50%);
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.74);
+        font:
+          600 12px/1.2 Arial,
+          sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        backdrop-filter: blur(8px);
+        pointer-events: none;
       }
 
       #roger {
@@ -39,9 +128,9 @@
         height: 140px;
         left: 50%;
         margin-left: -70px;
-        top: calc(100% - 160px);
+        top: calc(100% - 152px);
         will-change: top, transform;
-        /* No transition at start — set dynamically */
+        z-index: 2;
       }
 
       #roger img {
@@ -54,32 +143,26 @@
       /* Landing squish animation */
       @keyframes squish {
         0% {
-          transform: rotate(var(--rot)) scaleX(1) scaleY(1);
+          transform: rotate(var(--roger-rot)) scaleX(1) scaleY(1);
         }
         20% {
-          transform: rotate(var(--rot)) scaleX(1.35) scaleY(0.65);
+          transform: rotate(var(--roger-rot)) scaleX(1.35) scaleY(0.65);
         }
         45% {
-          transform: rotate(var(--rot)) scaleX(0.85) scaleY(1.15);
+          transform: rotate(var(--roger-rot)) scaleX(0.85) scaleY(1.15);
         }
         65% {
-          transform: rotate(var(--rot)) scaleX(1.1) scaleY(0.92);
+          transform: rotate(var(--roger-rot)) scaleX(1.1) scaleY(0.92);
         }
         80% {
-          transform: rotate(var(--rot)) scaleX(0.97) scaleY(1.03);
+          transform: rotate(var(--roger-rot)) scaleX(0.97) scaleY(1.03);
         }
         100% {
-          transform: rotate(var(--rot)) scaleX(1) scaleY(1);
+          transform: rotate(var(--roger-rot)) scaleX(1) scaleY(1);
         }
       }
 
-      #roger.squish-bottom {
-        --rot: 0deg;
-        animation: squish 0.45s ease-out forwards;
-      }
-
-      #roger.squish-top {
-        --rot: 180deg;
+      #roger.squish {
         animation: squish 0.45s ease-out forwards;
       }
 
@@ -111,26 +194,41 @@
       #overlay .sub {
         font-size: 14px;
         opacity: 0.55;
+        max-width: 280px;
+      }
+
+      body.desktop-ready #scene {
+        cursor: pointer;
       }
     </style>
   </head>
   <body>
     <div id="scene">
-      <img id="roger" src="rogerbot.png" alt="Roger" />
+      <div id="tubeRig">
+        <div id="tube" aria-hidden="true"></div>
+        <img id="roger" src="rogerbot.png" alt="Roger" />
+      </div>
+      <div id="tubeHint">Click Roger to flip</div>
     </div>
 
     <div id="overlay">
       <div class="big">🤙</div>
       <div class="main">Tap to start</div>
-      <div class="sub">Then flip your phone upside-down!</div>
+      <div class="sub">
+        On phone, flip your device. On desktop, click Roger to rotate him
+        through the tube.
+      </div>
     </div>
 
-    <audio id="audioUp" src="up.mp3" preload="auto"></audio>
+    <audio id="audioUp" src="up2.mp3" preload="auto"></audio>
     <audio id="audioDown" src="down.mp3" preload="auto"></audio>
 
     <script>
       const roger = document.getElementById("roger");
+      const scene = document.getElementById("scene");
+      const tubeRig = document.getElementById("tubeRig");
       const overlay = document.getElementById("overlay");
+      const tubeHint = document.getElementById("tubeHint");
       const audioUp = document.getElementById("audioUp");
       const audioDown = document.getElementById("audioDown");
 
@@ -145,24 +243,46 @@
       });
 
       /* ── Constants ── */
-      const TOP_PX = 20;
-      function getBottomPx() {
-        return window.innerHeight - 160;
+      const TOP_LOCAL_PX = 12;
+      const BOTTOM_PADDING_PX = 12;
+      const ROGER_SIZE_PX = 140;
+      const TUBE_FLIP_SECONDS = 0.24;
+      const FALL_SECONDS = 0.7;
+      const FALL_DELAY_SECONDS = 0;
+
+      function getBottomLocalPx() {
+        return tubeRig.clientHeight - ROGER_SIZE_PX - BOTTOM_PADDING_PX;
       }
 
       /* ── State ── */
       let flipped = false;
       let started = false;
       let animTimer = null;
+      const isDesktopLike = window.matchMedia(
+        "(hover: hover) and (pointer: fine)",
+      );
 
-      /* ── Read Roger's actual rendered top mid-animation ── */
-      function getCurrentTopPx() {
+      function syncDesktopMode() {
+        document.body.classList.toggle("desktop-ready", isDesktopLike.matches);
+        tubeHint.textContent = isDesktopLike.matches
+          ? "Click Roger to flip"
+          : "Flip your phone to move Roger";
+
+        if (!started) return;
+
+        tubeRig.style.transition = "none";
+        roger.style.transition = "none";
+        tubeRig.style.transform = `rotate(${isDesktopLike.matches && flipped ? 180 : 0}deg)`;
+        roger.style.top = (flipped ? TOP_LOCAL_PX : getBottomLocalPx()) + "px";
+        setRogerRotation(flipped ? 180 : 0, isDesktopLike.matches);
+      }
+
+      function getCurrentRogerTopPx() {
         return parseFloat(getComputedStyle(roger).top);
       }
 
-      /* ── Read Roger's actual rendered rotation mid-animation ── */
-      function getCurrentRotDeg() {
-        const mat = getComputedStyle(roger).transform;
+      function getCurrentTubeRotDeg() {
+        const mat = getComputedStyle(tubeRig).transform;
         if (!mat || mat === "none") return 0;
         const m = mat.match(/matrix\(([^)]+)\)/);
         if (!m) return 0;
@@ -170,63 +290,105 @@
         return Math.round((Math.atan2(parts[1], parts[0]) * 180) / Math.PI);
       }
 
-      function triggerSquish(cls) {
-        roger.classList.remove("squish-bottom", "squish-top");
-        void roger.offsetWidth;
-        roger.classList.add(cls);
+      function getRogerRotationDeg(tubeRotationDeg, isTubeRotating) {
+        return isTubeRotating ? -tubeRotationDeg : tubeRotationDeg;
       }
 
-      /* ── Core move: works whether idle or mid-animation ── */
-      function moveTo(destPx, totalDur, audio, squishCls, targetRot) {
-        // Cancel any in-flight landing timer
+      function setRogerRotation(tubeRotationDeg, isTubeRotating) {
+        const rogerRotationDeg = getRogerRotationDeg(
+          tubeRotationDeg,
+          isTubeRotating,
+        );
+        roger.style.setProperty(
+          "--roger-rot",
+          `${rogerRotationDeg}deg`,
+        );
+        roger.style.transform = `rotate(${rogerRotationDeg}deg)`;
+      }
+
+      function triggerSquish(tubeRotationDeg, isTubeRotating) {
+        const rogerRotationDeg = getRogerRotationDeg(
+          tubeRotationDeg,
+          isTubeRotating,
+        );
+        roger.classList.remove("squish");
+        roger.style.setProperty("--roger-rot", `${rogerRotationDeg}deg`);
+        void roger.offsetWidth;
+        roger.classList.add("squish");
+      }
+
+      function moveTo(destTopPx, targetTubeRot, audio) {
         if (animTimer) {
           clearTimeout(animTimer);
           animTimer = null;
         }
 
-        // Freeze Roger at its current rendered position
-        const currentPx = getCurrentTopPx();
-        const currentRot = getCurrentRotDeg();
+        const currentTopPx = getCurrentRogerTopPx();
+        const currentTubeRot = getCurrentTubeRotDeg();
+  const rotateTube = isDesktopLike.matches;
+  const effectiveTargetTubeRot = rotateTube ? targetTubeRot : 0;
+
+        tubeRig.style.transition = "none";
+  tubeRig.style.transform = `rotate(${currentTubeRot}deg)`;
         roger.style.transition = "none";
-        roger.style.top = currentPx + "px";
-        roger.style.transform = `rotate(${currentRot}deg)`;
-        void roger.offsetWidth; // reflow
+        roger.style.top = currentTopPx + "px";
+  setRogerRotation(currentTubeRot, rotateTube);
+        void roger.offsetWidth;
 
-        // Fraction of journey still remaining
-        const fullDist = getBottomPx() - TOP_PX;
-        const remainDist = Math.abs(destPx - currentPx);
-        const remain = Math.min(1, Math.max(0.01, remainDist / fullDist));
+        const fullDist = Math.max(1, getBottomLocalPx() - TOP_LOCAL_PX);
+        const fallRemainDist = Math.abs(destTopPx - currentTopPx);
+        const fallRemain = Math.min(
+          1,
+          Math.max(0.01, fallRemainDist / fullDist),
+        );
+        const rotationRemain = Math.min(
+          1,
+          Math.max(0.01, Math.abs(effectiveTargetTubeRot - currentTubeRot) / 180),
+        );
 
-        // Seek audio to matching position so it ends exactly when animation does
         audio.pause();
-        audio.currentTime = (1 - remain) * totalDur;
+        audio.currentTime = 0;
         audio.play().catch(() => {});
 
-        const dur = remain * totalDur;
+        const tubeDur = Math.max(0.12, rotationRemain * TUBE_FLIP_SECONDS);
+        const fallDur = Math.max(0.24, fallRemain * FALL_SECONDS);
+        const releaseDelay = tubeDur + FALL_DELAY_SECONDS;
 
-        // Animate to destination
-        roger.style.transition = `top ${dur}s cubic-bezier(0.42,0,1,1), transform ${dur * 0.25}s ease-in`;
-        roger.style.top = destPx + "px";
-        roger.style.transform = `rotate(${targetRot}deg)`;
+        tubeRig.style.transition = `transform ${tubeDur}s linear`;
+        roger.style.transition = `top ${fallDur}s linear ${releaseDelay}s, transform ${Math.max(0.16, tubeDur * 0.9)}s linear`;
+        tubeRig.style.transform = `rotate(${effectiveTargetTubeRot}deg)`;
+        roger.style.top = destTopPx + "px";
+        setRogerRotation(targetTubeRot, rotateTube);
 
-        animTimer = setTimeout(() => {
-          triggerSquish(squishCls);
-          animTimer = null;
-        }, dur * 1000);
+        animTimer = setTimeout(
+          () => {
+            triggerSquish(targetTubeRot, rotateTube);
+            animTimer = null;
+          },
+          (releaseDelay + fallDur) * 1000,
+        );
       }
 
       function goUp() {
         flipped = true;
-        moveTo(TOP_PX, upDur, audioUp, "squish-top", 180);
+        moveTo(TOP_LOCAL_PX, 180, audioUp);
       }
+
       function goDown() {
         flipped = false;
-        moveTo(getBottomPx(), downDur, audioDown, "squish-bottom", 0);
+        moveTo(getBottomLocalPx(), 0, audioDown);
+      }
+
+      function toggleRoger() {
+        if (!started) return;
+        if (flipped) goDown();
+        else goUp();
       }
 
       /* ── Device orientation ── */
       function handleOrientation(e) {
         if (!started) return;
+        if (isDesktopLike.matches) return;
         const beta = e.beta;
         if (beta === null) return;
 
@@ -246,10 +408,11 @@
         overlay.style.display = "none";
         started = true;
 
-        // Snap Roger to bottom
+        tubeRig.style.transition = "none";
+        tubeRig.style.transform = "rotate(0deg)";
         roger.style.transition = "none";
-        roger.style.top = getBottomPx() + "px";
-        roger.style.transform = "rotate(0deg)";
+        roger.style.top = getBottomLocalPx() + "px";
+        setRogerRotation(0, isDesktopLike.matches);
         flipped = false;
 
         // Unlock iOS audio
@@ -273,6 +436,23 @@
         } else {
           window.addEventListener("deviceorientation", handleOrientation);
         }
+      });
+
+      scene.addEventListener("click", () => {
+        if (!started || !isDesktopLike.matches) return;
+        toggleRoger();
+      });
+
+      isDesktopLike.addEventListener("change", syncDesktopMode);
+      syncDesktopMode();
+
+      window.addEventListener("resize", () => {
+        if (!started) return;
+        tubeRig.style.transition = "none";
+        roger.style.transition = "none";
+        tubeRig.style.transform = `rotate(${isDesktopLike.matches && flipped ? 180 : 0}deg)`;
+        roger.style.top = (flipped ? TOP_LOCAL_PX : getBottomLocalPx()) + "px";
+        setRogerRotation(flipped ? 180 : 0, isDesktopLike.matches);
       });
     </script>
   </body>
