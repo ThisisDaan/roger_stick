@@ -90,11 +90,7 @@
     <img id="roger" src="rogerbot.png" alt="Roger">
   </div>
 
-  <div id="overlay">
-    <div class="big">🤙</div>
-    <div class="main">Tap to start</div>
-    <div class="sub">Then flip your phone upside-down!</div>
-  </div>
+
 
   <audio id="audioUp"   src="up.mp3"   preload="auto"></audio>
   <audio id="audioDown" src="down.mp3" preload="auto"></audio>
@@ -115,7 +111,6 @@
     /* ── State ── */
     let flipped   = false; // true = phone is upside-down
     let animating = false;
-    let started   = false;
 
     /* ── Helpers ── */
     function playAudio(audio) {
@@ -166,7 +161,7 @@
 
     /* ── Device orientation ── */
     function handleOrientation(e) {
-      if (!started || animating) return;
+      if (animating) return;
       const beta = e.beta; // −180 → 180; ~90 upright, ~−90 upside-down
       if (beta === null) return;
 
@@ -183,18 +178,14 @@
       else         goDown();
     }
 
-    /* ── Start on tap ── */
-    overlay.addEventListener('click', () => {
-      overlay.style.display = 'none';
-      started = true;
+    // Snap Roger to bottom without animation on load
+    roger.style.transition = 'none';
+    roger.style.top        = `calc(100% - 160px)`;
+    roger.style.transform  = 'rotate(0deg)';
+    flipped = false;
 
-      // Snap Roger to bottom without animation
-      roger.style.transition = 'none';
-      roger.style.top        = `calc(100% - 160px)`;
-      roger.style.transform  = 'rotate(0deg)';
-      flipped = false;
-
-      // Request permission on iOS 13+
+    // Request permission on iOS 13+ automatically
+    window.addEventListener('DOMContentLoaded', () => {
       if (typeof DeviceOrientationEvent !== 'undefined' &&
           typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission()
