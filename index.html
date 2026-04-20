@@ -106,19 +106,21 @@
       #tubeHint {
         position: absolute;
         left: 50%;
-        bottom: 26px;
-        transform: translateX(-50%);
-        padding: 10px 14px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.08);
+        top: 50%;
+        width: 120px;
+        transform: translate(-50%, -50%);
+        padding: 10px 12px;
+        border-radius: 18px;
+        background: rgba(10, 14, 18, 0.18);
         color: rgba(255, 255, 255, 0.74);
         font:
-          600 12px/1.2 Arial,
+          600 11px/1.35 Arial,
           sans-serif;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        white-space: nowrap;
-        z-index: 4;
+        text-align: center;
+        white-space: normal;
+        z-index: 1;
         isolation: isolate;
         will-change: transform;
         backface-visibility: hidden;
@@ -210,9 +212,9 @@
     <div id="scene">
       <div id="tubeRig">
         <div id="tube" aria-hidden="true"></div>
+        <div id="tubeHint">Click Roger to flip</div>
         <img id="roger" src="rogerbot.png" alt="Roger" />
       </div>
-      <div id="tubeHint">Click Roger to flip</div>
     </div>
 
     <div id="overlay">
