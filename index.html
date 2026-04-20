@@ -88,35 +88,30 @@
         position: fixed;
         inset: 0;
         display: flex;
-        flex-direction: column;
-        align-items: center;
+        align-items: flex-end;
         justify-content: center;
-        background: rgba(0, 0, 0, 0.82);
-        color: #fff;
-        font-family: Arial, sans-serif;
-        text-align: center;
-        gap: 14px;
+        padding-bottom: 48px;
+        background: transparent;
         cursor: pointer;
         z-index: 20;
       }
 
-      #overlay .big {
-        font-size: 56px;
-        line-height: 1;
-      }
-      #overlay .main {
-        font-size: 24px;
-        font-weight: bold;
-      }
-      #overlay .sub {
-        font-size: 14px;
-        opacity: 0.55;
+      #overlay .hint {
+        font-family: Arial, sans-serif;
+        font-size: 15px;
+        color: rgba(255, 255, 255, 0.5);
+        letter-spacing: 0.03em;
+        pointer-events: none;
       }
     </style>
   </head>
   <body>
     <div id="scene">
       <img id="roger" src="rogerbot.png" alt="Roger" />
+    </div>
+
+    <div id="overlay">
+      <div class="hint">tap to start</div>
     </div>
 
     <audio id="audioUp" src="up.mp3" preload="auto"></audio>
@@ -215,8 +210,18 @@
       roger.style.transform = "rotate(0deg)";
       flipped = false;
 
-      // Request permission on iOS 13+ automatically
-      window.addEventListener("DOMContentLoaded", () => {
+      // Tap to start — required on iOS to unlock gyroscope + audio
+      const overlay = document.getElementById("overlay");
+      overlay.addEventListener("click", () => {
+        overlay.style.display = "none";
+
+        // Unlock audio on iOS by playing + immediately pausing
+        [audioUp, audioDown].forEach((a) => {
+          a.play()
+            .then(() => a.pause())
+            .catch(() => {});
+        });
+
         if (
           typeof DeviceOrientationEvent !== "undefined" &&
           typeof DeviceOrientationEvent.requestPermission === "function"
