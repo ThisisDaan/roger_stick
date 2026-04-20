@@ -134,10 +134,9 @@
       const audioUp = document.getElementById("audioUp");
       const audioDown = document.getElementById("audioDown");
 
-      /* ── Audio durations (fall back to 0.9s if metadata not ready) ── */
+      /* ── Audio durations ── */
       let upDur = 0.9;
       let downDur = 0.9;
-
       audioUp.addEventListener("loadedmetadata", () => {
         upDur = Math.max(0.3, audioUp.duration);
       });
@@ -145,89 +144,122 @@
         downDur = Math.max(0.3, audioDown.duration);
       });
 
-      /* ── State ── */
-      let flipped = false; // true = phone is upside-down
-      let animating = false;
-      let started = false;
+      /* ── Constants ── */
+      const TOP_PX = 20;
+      function getBottomPx() {
+        return window.innerHeight - 160;
+      }
 
-      /* ── Helpers ── */
-      function playAudio(audio) {
-        audio.pause();
-        audio.currentTime = 0;
-        audio.play().catch(() => {});
+      /* ── State ── */
+      let flipped = false;
+      let started = false;
+      let animTimer = null;
+
+      /* ── Read Roger's actual rendered top mid-animation ── */
+      function getCurrentTopPx() {
+        return parseFloat(getComputedStyle(roger).top);
+      }
+
+      /* ── Read Roger's actual rendered rotation mid-animation ── */
+      function getCurrentRotDeg() {
+        const mat = getComputedStyle(roger).transform;
+        if (!mat || mat === "none") return 0;
+        const m = mat.match(/matrix\(([^)]+)\)/);
+        if (!m) return 0;
+        const parts = m[1].split(",").map(parseFloat);
+        return Math.round((Math.atan2(parts[1], parts[0]) * 180) / Math.PI);
       }
 
       function triggerSquish(cls) {
         roger.classList.remove("squish-bottom", "squish-top");
-        void roger.offsetWidth; // reflow to restart animation
+        void roger.offsetWidth;
         roger.classList.add(cls);
       }
 
-      /* ── Movement ── */
-      function goUp() {
-        animating = true;
-        playAudio(audioUp);
+      /* ── Core move: works whether idle or mid-animation ── */
+      function moveTo(destPx, totalDur, audio, squishCls, targetRot) {
+        // Cancel any in-flight landing timer
+        if (animTimer) {
+          clearTimeout(animTimer);
+          animTimer = null;
+        }
 
-        // Gravity-like ease-in for the fall (accelerates toward new bottom)
-        roger.style.transition =
-          `top ${upDur}s cubic-bezier(0.42,0,1,1),` +
-          `transform ${upDur * 0.25}s ease-in`;
-        roger.style.top = "20px";
-        roger.style.transform = "rotate(180deg)";
+        // Freeze Roger at its current rendered position
+        const currentPx = getCurrentTopPx();
+        const currentRot = getCurrentRotDeg();
+        roger.style.transition = "none";
+        roger.style.top = currentPx + "px";
+        roger.style.transform = `rotate(${currentRot}deg)`;
+        void roger.offsetWidth; // reflow
 
-        setTimeout(() => {
-          triggerSquish("squish-top");
-          animating = false;
-        }, upDur * 1000);
+        // Fraction of journey still remaining
+        const fullDist = getBottomPx() - TOP_PX;
+        const remainDist = Math.abs(destPx - currentPx);
+        const remain = Math.min(1, Math.max(0.01, remainDist / fullDist));
+
+        // Seek audio to matching position so it ends exactly when animation does
+        audio.pause();
+        audio.currentTime = (1 - remain) * totalDur;
+        audio.play().catch(() => {});
+
+        const dur = remain * totalDur;
+
+        // Animate to destination
+        roger.style.transition = `top ${dur}s cubic-bezier(0.42,0,1,1), transform ${dur * 0.25}s ease-in`;
+        roger.style.top = destPx + "px";
+        roger.style.transform = `rotate(${targetRot}deg)`;
+
+        animTimer = setTimeout(() => {
+          triggerSquish(squishCls);
+          animTimer = null;
+        }, dur * 1000);
       }
 
+      function goUp() {
+        flipped = true;
+        moveTo(TOP_PX, upDur, audioUp, "squish-top", 180);
+      }
       function goDown() {
-        animating = true;
-        playAudio(audioDown);
-
-        roger.style.transition =
-          `top ${downDur}s cubic-bezier(0.42,0,1,1),` +
-          `transform ${downDur * 0.25}s ease-in`;
-        roger.style.top = `calc(100% - 160px)`;
-        roger.style.transform = "rotate(0deg)";
-
-        setTimeout(() => {
-          triggerSquish("squish-bottom");
-          animating = false;
-        }, downDur * 1000);
+        flipped = false;
+        moveTo(getBottomPx(), downDur, audioDown, "squish-bottom", 0);
       }
 
       /* ── Device orientation ── */
       function handleOrientation(e) {
-        if (!started || animating) return;
-        const beta = e.beta; // −180 → 180; ~90 upright, ~−90 upside-down
+        if (!started) return;
+        const beta = e.beta;
         if (beta === null) return;
 
-        // Hysteresis thresholds to avoid jitter around flat (0°)
         let nowFlipped;
         if (beta < -25) nowFlipped = true;
         else if (beta > 25) nowFlipped = false;
         else return; // flat zone – ignore
 
-        if (nowFlipped === flipped) return;
-        flipped = nowFlipped;
+        if (nowFlipped === flipped) return; // already going that way
 
-        if (flipped) goUp();
+        if (nowFlipped) goUp();
         else goDown();
       }
 
-      /* ── Start on tap ── */
+      /* ── Start on tap (required for iOS gyro + audio unlock) ── */
       overlay.addEventListener("click", () => {
         overlay.style.display = "none";
         started = true;
 
-        // Snap Roger to bottom without animation
+        // Snap Roger to bottom
         roger.style.transition = "none";
-        roger.style.top = `calc(100% - 160px)`;
+        roger.style.top = getBottomPx() + "px";
         roger.style.transform = "rotate(0deg)";
         flipped = false;
 
-        // Request permission on iOS 13+
+        // Unlock iOS audio
+        [audioUp, audioDown].forEach((a) => {
+          a.play()
+            .then(() => a.pause())
+            .catch(() => {});
+        });
+
+        // Request gyroscope permission on iOS 13+
         if (
           typeof DeviceOrientationEvent !== "undefined" &&
           typeof DeviceOrientationEvent.requestPermission === "function"
