@@ -118,7 +118,11 @@
         letter-spacing: 0.08em;
         text-transform: uppercase;
         white-space: nowrap;
-        backdrop-filter: blur(8px);
+        z-index: 4;
+        isolation: isolate;
+        will-change: transform;
+        backface-visibility: hidden;
+        -webkit-font-smoothing: antialiased;
         pointer-events: none;
       }
 
