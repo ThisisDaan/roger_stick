@@ -299,10 +299,7 @@
           tubeRotationDeg,
           isTubeRotating,
         );
-        roger.style.setProperty(
-          "--roger-rot",
-          `${rogerRotationDeg}deg`,
-        );
+        roger.style.setProperty("--roger-rot", `${rogerRotationDeg}deg`);
         roger.style.transform = `rotate(${rogerRotationDeg}deg)`;
       }
 
@@ -325,14 +322,14 @@
 
         const currentTopPx = getCurrentRogerTopPx();
         const currentTubeRot = getCurrentTubeRotDeg();
-  const rotateTube = isDesktopLike.matches;
-  const effectiveTargetTubeRot = rotateTube ? targetTubeRot : 0;
+        const rotateTube = isDesktopLike.matches;
+        const effectiveTargetTubeRot = rotateTube ? targetTubeRot : 0;
 
         tubeRig.style.transition = "none";
-  tubeRig.style.transform = `rotate(${currentTubeRot}deg)`;
+        tubeRig.style.transform = `rotate(${currentTubeRot}deg)`;
         roger.style.transition = "none";
         roger.style.top = currentTopPx + "px";
-  setRogerRotation(currentTubeRot, rotateTube);
+        setRogerRotation(currentTubeRot, rotateTube);
         void roger.offsetWidth;
 
         const fullDist = Math.max(1, getBottomLocalPx() - TOP_LOCAL_PX);
@@ -343,7 +340,10 @@
         );
         const rotationRemain = Math.min(
           1,
-          Math.max(0.01, Math.abs(effectiveTargetTubeRot - currentTubeRot) / 180),
+          Math.max(
+            0.01,
+            Math.abs(effectiveTargetTubeRot - currentTubeRot) / 180,
+          ),
         );
 
         audio.pause();
