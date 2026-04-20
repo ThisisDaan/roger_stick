@@ -1,203 +1,236 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
-  <title>Roger Stick</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #111;
-      touch-action: none;
-      -webkit-user-select: none;
-      user-select: none;
-    }
-
-    #scene {
-      position: relative;
-      width: 100%;
-      height: 100%;
-    }
-
-    #roger {
-      position: absolute;
-      width: 140px;
-      height: 140px;
-      left: 50%;
-      margin-left: -70px;
-      top: calc(100% - 160px);
-      will-change: top, transform;
-      /* No transition at start — set dynamically */
-    }
-
-    #roger img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      display: block;
-    }
-
-    /* Landing squish animation */
-    @keyframes squish {
-      0%   { transform: rotate(var(--rot)) scaleX(1)   scaleY(1); }
-      20%  { transform: rotate(var(--rot)) scaleX(1.35) scaleY(0.65); }
-      45%  { transform: rotate(var(--rot)) scaleX(0.85) scaleY(1.15); }
-      65%  { transform: rotate(var(--rot)) scaleX(1.1)  scaleY(0.92); }
-      80%  { transform: rotate(var(--rot)) scaleX(0.97) scaleY(1.03); }
-      100% { transform: rotate(var(--rot)) scaleX(1)   scaleY(1); }
-    }
-
-    #roger.squish-bottom {
-      --rot: 0deg;
-      animation: squish 0.45s ease-out forwards;
-    }
-
-    #roger.squish-top {
-      --rot: 180deg;
-      animation: squish 0.45s ease-out forwards;
-    }
-
-    /* Tap-to-start overlay */
-    #overlay {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0, 0, 0, 0.82);
-      color: #fff;
-      font-family: Arial, sans-serif;
-      text-align: center;
-      gap: 14px;
-      cursor: pointer;
-      z-index: 20;
-    }
-
-    #overlay .big { font-size: 56px; line-height: 1; }
-    #overlay .main { font-size: 24px; font-weight: bold; }
-    #overlay .sub  { font-size: 14px; opacity: 0.55; }
-  </style>
-</head>
-<body>
-  <div id="scene">
-    <img id="roger" src="rogerbot.png" alt="Roger">
-  </div>
-
-
-
-  <audio id="audioUp"   src="up.mp3"   preload="auto"></audio>
-  <audio id="audioDown" src="down.mp3" preload="auto"></audio>
-
-  <script>
-    const roger    = document.getElementById('roger');
-    const overlay  = document.getElementById('overlay');
-    const audioUp   = document.getElementById('audioUp');
-    const audioDown = document.getElementById('audioDown');
-
-    /* ── Audio durations (fall back to 0.9s if metadata not ready) ── */
-    let upDur   = 0.9;
-    let downDur = 0.9;
-
-    audioUp.addEventListener('loadedmetadata',   () => { upDur   = Math.max(0.3, audioUp.duration);   });
-    audioDown.addEventListener('loadedmetadata', () => { downDur = Math.max(0.3, audioDown.duration); });
-
-    /* ── State ── */
-    let flipped   = false; // true = phone is upside-down
-    let animating = false;
-
-    /* ── Helpers ── */
-    function playAudio(audio) {
-      audio.pause();
-      audio.currentTime = 0;
-      audio.play().catch(() => {});
-    }
-
-    function triggerSquish(cls) {
-      roger.classList.remove('squish-bottom', 'squish-top');
-      void roger.offsetWidth; // reflow to restart animation
-      roger.classList.add(cls);
-    }
-
-    /* ── Movement ── */
-    function goUp() {
-      animating = true;
-      playAudio(audioUp);
-
-      // Gravity-like ease-in for the fall (accelerates toward new bottom)
-      roger.style.transition =
-        `top ${upDur}s cubic-bezier(0.42,0,1,1),` +
-        `transform ${upDur * 0.25}s ease-in`;
-      roger.style.top       = '20px';
-      roger.style.transform = 'rotate(180deg)';
-
-      setTimeout(() => {
-        triggerSquish('squish-top');
-        animating = false;
-      }, upDur * 1000);
-    }
-
-    function goDown() {
-      animating = true;
-      playAudio(audioDown);
-
-      roger.style.transition =
-        `top ${downDur}s cubic-bezier(0.42,0,1,1),` +
-        `transform ${downDur * 0.25}s ease-in`;
-      roger.style.top       = `calc(100% - 160px)`;
-      roger.style.transform = 'rotate(0deg)';
-
-      setTimeout(() => {
-        triggerSquish('squish-bottom');
-        animating = false;
-      }, downDur * 1000);
-    }
-
-    /* ── Device orientation ── */
-    function handleOrientation(e) {
-      if (animating) return;
-      const beta = e.beta; // −180 → 180; ~90 upright, ~−90 upside-down
-      if (beta === null) return;
-
-      // Hysteresis thresholds to avoid jitter around flat (0°)
-      let nowFlipped;
-      if (beta < -25)      nowFlipped = true;
-      else if (beta > 25)  nowFlipped = false;
-      else return; // flat zone – ignore
-
-      if (nowFlipped === flipped) return;
-      flipped = nowFlipped;
-
-      if (flipped) goUp();
-      else         goDown();
-    }
-
-    // Snap Roger to bottom without animation on load
-    roger.style.transition = 'none';
-    roger.style.top        = `calc(100% - 160px)`;
-    roger.style.transform  = 'rotate(0deg)';
-    flipped = false;
-
-    // Request permission on iOS 13+ automatically
-    window.addEventListener('DOMContentLoaded', () => {
-      if (typeof DeviceOrientationEvent !== 'undefined' &&
-          typeof DeviceOrientationEvent.requestPermission === 'function') {
-        DeviceOrientationEvent.requestPermission()
-          .then(r => {
-            if (r === 'granted')
-              window.addEventListener('deviceorientation', handleOrientation);
-          })
-          .catch(console.error);
-      } else {
-        window.addEventListener('deviceorientation', handleOrientation);
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>Roger Stick</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
-    });
-  </script>
-</body>
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #111;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+
+      #scene {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+
+      #roger {
+        position: absolute;
+        width: 140px;
+        height: 140px;
+        left: 50%;
+        margin-left: -70px;
+        top: calc(100% - 160px);
+        will-change: top, transform;
+        /* No transition at start — set dynamically */
+      }
+
+      #roger img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+      }
+
+      /* Landing squish animation */
+      @keyframes squish {
+        0% {
+          transform: rotate(var(--rot)) scaleX(1) scaleY(1);
+        }
+        20% {
+          transform: rotate(var(--rot)) scaleX(1.35) scaleY(0.65);
+        }
+        45% {
+          transform: rotate(var(--rot)) scaleX(0.85) scaleY(1.15);
+        }
+        65% {
+          transform: rotate(var(--rot)) scaleX(1.1) scaleY(0.92);
+        }
+        80% {
+          transform: rotate(var(--rot)) scaleX(0.97) scaleY(1.03);
+        }
+        100% {
+          transform: rotate(var(--rot)) scaleX(1) scaleY(1);
+        }
+      }
+
+      #roger.squish-bottom {
+        --rot: 0deg;
+        animation: squish 0.45s ease-out forwards;
+      }
+
+      #roger.squish-top {
+        --rot: 180deg;
+        animation: squish 0.45s ease-out forwards;
+      }
+
+      /* Tap-to-start overlay */
+      #overlay {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.82);
+        color: #fff;
+        font-family: Arial, sans-serif;
+        text-align: center;
+        gap: 14px;
+        cursor: pointer;
+        z-index: 20;
+      }
+
+      #overlay .big {
+        font-size: 56px;
+        line-height: 1;
+      }
+      #overlay .main {
+        font-size: 24px;
+        font-weight: bold;
+      }
+      #overlay .sub {
+        font-size: 14px;
+        opacity: 0.55;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="scene">
+      <img id="roger" src="rogerbot.png" alt="Roger" />
+    </div>
+
+    <audio id="audioUp" src="up.mp3" preload="auto"></audio>
+    <audio id="audioDown" src="down.mp3" preload="auto"></audio>
+
+    <script>
+      const roger = document.getElementById("roger");
+      const overlay = document.getElementById("overlay");
+      const audioUp = document.getElementById("audioUp");
+      const audioDown = document.getElementById("audioDown");
+
+      /* ── Audio durations (fall back to 0.9s if metadata not ready) ── */
+      let upDur = 0.9;
+      let downDur = 0.9;
+
+      audioUp.addEventListener("loadedmetadata", () => {
+        upDur = Math.max(0.3, audioUp.duration);
+      });
+      audioDown.addEventListener("loadedmetadata", () => {
+        downDur = Math.max(0.3, audioDown.duration);
+      });
+
+      /* ── State ── */
+      let flipped = false; // true = phone is upside-down
+      let animating = false;
+
+      /* ── Helpers ── */
+      function playAudio(audio) {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      }
+
+      function triggerSquish(cls) {
+        roger.classList.remove("squish-bottom", "squish-top");
+        void roger.offsetWidth; // reflow to restart animation
+        roger.classList.add(cls);
+      }
+
+      /* ── Movement ── */
+      function goUp() {
+        animating = true;
+        playAudio(audioUp);
+
+        // Gravity-like ease-in for the fall (accelerates toward new bottom)
+        roger.style.transition =
+          `top ${upDur}s cubic-bezier(0.42,0,1,1),` +
+          `transform ${upDur * 0.25}s ease-in`;
+        roger.style.top = "20px";
+        roger.style.transform = "rotate(180deg)";
+
+        setTimeout(() => {
+          triggerSquish("squish-top");
+          animating = false;
+        }, upDur * 1000);
+      }
+
+      function goDown() {
+        animating = true;
+        playAudio(audioDown);
+
+        roger.style.transition =
+          `top ${downDur}s cubic-bezier(0.42,0,1,1),` +
+          `transform ${downDur * 0.25}s ease-in`;
+        roger.style.top = `calc(100% - 160px)`;
+        roger.style.transform = "rotate(0deg)";
+
+        setTimeout(() => {
+          triggerSquish("squish-bottom");
+          animating = false;
+        }, downDur * 1000);
+      }
+
+      /* ── Device orientation ── */
+      function handleOrientation(e) {
+        if (animating) return;
+        const beta = e.beta; // −180 → 180; ~90 upright, ~−90 upside-down
+        if (beta === null) return;
+
+        // Hysteresis thresholds to avoid jitter around flat (0°)
+        let nowFlipped;
+        if (beta < -25) nowFlipped = true;
+        else if (beta > 25) nowFlipped = false;
+        else return; // flat zone – ignore
+
+        if (nowFlipped === flipped) return;
+        flipped = nowFlipped;
+
+        if (flipped) goUp();
+        else goDown();
+      }
+
+      // Snap Roger to bottom without animation on load
+      roger.style.transition = "none";
+      roger.style.top = `calc(100% - 160px)`;
+      roger.style.transform = "rotate(0deg)";
+      flipped = false;
+
+      // Request permission on iOS 13+ automatically
+      window.addEventListener("DOMContentLoaded", () => {
+        if (
+          typeof DeviceOrientationEvent !== "undefined" &&
+          typeof DeviceOrientationEvent.requestPermission === "function"
+        ) {
+          DeviceOrientationEvent.requestPermission()
+            .then((r) => {
+              if (r === "granted")
+                window.addEventListener("deviceorientation", handleOrientation);
+            })
+            .catch(console.error);
+        } else {
+          window.addEventListener("deviceorientation", handleOrientation);
+        }
+      });
+    </script>
+  </body>
 </html>
