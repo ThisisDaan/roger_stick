@@ -88,20 +88,29 @@
         position: fixed;
         inset: 0;
         display: flex;
-        align-items: flex-end;
+        flex-direction: column;
+        align-items: center;
         justify-content: center;
-        padding-bottom: 48px;
-        background: transparent;
+        background: rgba(0, 0, 0, 0.82);
+        color: #fff;
+        font-family: Arial, sans-serif;
+        text-align: center;
+        gap: 14px;
         cursor: pointer;
         z-index: 20;
       }
 
-      #overlay .hint {
-        font-family: Arial, sans-serif;
-        font-size: 15px;
-        color: rgba(255, 255, 255, 0.5);
-        letter-spacing: 0.03em;
-        pointer-events: none;
+      #overlay .big {
+        font-size: 56px;
+        line-height: 1;
+      }
+      #overlay .main {
+        font-size: 24px;
+        font-weight: bold;
+      }
+      #overlay .sub {
+        font-size: 14px;
+        opacity: 0.55;
       }
     </style>
   </head>
@@ -111,7 +120,9 @@
     </div>
 
     <div id="overlay">
-      <div class="hint">tap to start</div>
+      <div class="big">🤙</div>
+      <div class="main">Tap to start</div>
+      <div class="sub">Then flip your phone upside-down!</div>
     </div>
 
     <audio id="audioUp" src="up.mp3" preload="auto"></audio>
@@ -137,6 +148,7 @@
       /* ── State ── */
       let flipped = false; // true = phone is upside-down
       let animating = false;
+      let started = false;
 
       /* ── Helpers ── */
       function playAudio(audio) {
@@ -187,7 +199,7 @@
 
       /* ── Device orientation ── */
       function handleOrientation(e) {
-        if (animating) return;
+        if (!started || animating) return;
         const beta = e.beta; // −180 → 180; ~90 upright, ~−90 upside-down
         if (beta === null) return;
 
@@ -204,24 +216,18 @@
         else goDown();
       }
 
-      // Snap Roger to bottom without animation on load
-      roger.style.transition = "none";
-      roger.style.top = `calc(100% - 160px)`;
-      roger.style.transform = "rotate(0deg)";
-      flipped = false;
-
-      // Tap to start — required on iOS to unlock gyroscope + audio
-      const overlay = document.getElementById("overlay");
+      /* ── Start on tap ── */
       overlay.addEventListener("click", () => {
         overlay.style.display = "none";
+        started = true;
 
-        // Unlock audio on iOS by playing + immediately pausing
-        [audioUp, audioDown].forEach((a) => {
-          a.play()
-            .then(() => a.pause())
-            .catch(() => {});
-        });
+        // Snap Roger to bottom without animation
+        roger.style.transition = "none";
+        roger.style.top = `calc(100% - 160px)`;
+        roger.style.transform = "rotate(0deg)";
+        flipped = false;
 
+        // Request permission on iOS 13+
         if (
           typeof DeviceOrientationEvent !== "undefined" &&
           typeof DeviceOrientationEvent.requestPermission === "function"
