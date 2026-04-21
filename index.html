@@ -252,6 +252,29 @@
         up: null,
         down: null,
       };
+      const mediaPools = {
+        up: null,
+        down: null,
+      };
+
+      function createMediaPool(template, size = 4) {
+        return Array.from({ length: size }, () => {
+          const audio = template.cloneNode(true);
+          audio.preload = "auto";
+          audio.setAttribute("playsinline", "");
+          audio.load();
+          return audio;
+        });
+      }
+
+      function getMediaPool(key) {
+        if (!mediaPools[key]) {
+          mediaPools[key] = createMediaPool(
+            key === "up" ? audioUp : audioDown,
+          );
+        }
+        return mediaPools[key];
+      }
 
       function fetchSoundFile(template) {
         const src = template.currentSrc || template.src;
@@ -318,17 +341,63 @@
         ]);
       }
 
+      function primeMediaPool(key) {
+        getMediaPool(key).forEach((audio) => {
+          audio.muted = true;
+          try {
+            audio.currentTime = 0;
+          } catch {}
+
+          const playAttempt = audio.play();
+          if (!playAttempt || typeof playAttempt.then !== "function") {
+            audio.muted = false;
+            return;
+          }
+
+          playAttempt
+            .then(() => {
+              audio.pause();
+              try {
+                audio.currentTime = 0;
+              } catch {}
+              audio.muted = false;
+            })
+            .catch(() => {
+              audio.muted = false;
+            });
+        });
+      }
+
+      function playFromMediaPool(key) {
+        const pool = getMediaPool(key);
+        const audio =
+          pool.find((item) => item.paused || item.ended) || pool[0] || null;
+
+        if (!audio) return;
+
+        audio.pause();
+        audio.muted = false;
+        try {
+          audio.currentTime = 0;
+        } catch {}
+        audio.play().catch(() => {});
+      }
+
       async function playSound(key) {
         const context = await ensureAudioContextReady();
-        if (!context) return;
+        const buffer = context
+          ? soundBuffers[key] || (await ensureSoundBuffer(key))
+          : null;
 
-        const buffer = soundBuffers[key] || (await ensureSoundBuffer(key));
-        if (!buffer) return;
+        if (context && buffer) {
+          const source = context.createBufferSource();
+          source.buffer = buffer;
+          source.connect(context.destination);
+          source.start(0);
+          return;
+        }
 
-        const source = context.createBufferSource();
-        source.buffer = buffer;
-        source.connect(context.destination);
-        source.start(0);
+        playFromMediaPool(key);
       }
 
       /* ── Constants ── */
@@ -512,8 +581,10 @@
         overlaySub.textContent = "Loading sound and motion access.";
 
         const orientationAccessPromise = requestOrientationAccess();
-        await ensureAudioContextReady();
-        await primeSoundBuffers();
+        const audioContextPromise = ensureAudioContextReady();
+        primeMediaPool("up");
+        primeMediaPool("down");
+        void audioContextPromise.then(() => primeSoundBuffers());
 
         overlay.style.display = "none";
         started = true;
