@@ -241,7 +241,8 @@
       const overlaySub = overlay.querySelector(".sub");
 
       /* ── Audio ── */
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      const AudioContextClass =
+        window.AudioContext || window.webkitAudioContext;
       let audioContext = null;
       const soundBuffers = {
         up: null,
