@@ -269,9 +269,7 @@
 
       function getMediaPool(key) {
         if (!mediaPools[key]) {
-          mediaPools[key] = createMediaPool(
-            key === "up" ? audioUp : audioDown,
-          );
+          mediaPools[key] = createMediaPool(key === "up" ? audioUp : audioDown);
         }
         return mediaPools[key];
       }
