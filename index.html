@@ -248,6 +248,66 @@
         downDur = Math.max(0.3, audioDown.duration);
       });
 
+      function createAudioPool(template, size = 4) {
+        const src = template.currentSrc || template.src;
+        return {
+          index: 0,
+          items: Array.from({ length: size }, () => {
+            const audio = new Audio(src);
+            audio.preload = "auto";
+            audio.setAttribute("playsinline", "");
+            audio.load();
+            return audio;
+          }),
+        };
+      }
+
+      const audioPools = {
+        up: createAudioPool(audioUp),
+        down: createAudioPool(audioDown),
+      };
+
+      function playFromPool(pool) {
+        const availableIndex = pool.items.findIndex(
+          (item) => item.paused || item.ended,
+        );
+        const nextIndex = availableIndex === -1 ? pool.index : availableIndex;
+        const audio = pool.items[nextIndex];
+
+        pool.index = (nextIndex + 1) % pool.items.length;
+
+        audio.pause();
+        try {
+          audio.currentTime = 0;
+        } catch {}
+
+        audio.play().catch(() => {
+          audio.load();
+        });
+      }
+
+      function primeAudioPool(pool) {
+        pool.items.forEach((audio) => {
+          audio.muted = true;
+          try {
+            audio.currentTime = 0;
+          } catch {}
+
+          audio
+            .play()
+            .then(() => {
+              audio.pause();
+              try {
+                audio.currentTime = 0;
+              } catch {}
+              audio.muted = false;
+            })
+            .catch(() => {
+              audio.muted = false;
+            });
+        });
+      }
+
       /* ── Constants ── */
       const TOP_LOCAL_PX = 12;
       const BOTTOM_PADDING_PX = 12;
@@ -320,7 +380,7 @@
         roger.classList.add("squish");
       }
 
-      function moveTo(destTopPx, targetTubeRot, audio) {
+      function moveTo(destTopPx, targetTubeRot, soundKey) {
         if (animTimer) {
           clearTimeout(animTimer);
           animTimer = null;
@@ -352,9 +412,7 @@
           ),
         );
 
-        audio.pause();
-        audio.currentTime = 0;
-        audio.play().catch(() => {});
+        playFromPool(audioPools[soundKey]);
 
         const tubeDur = Math.max(0.12, rotationRemain * TUBE_FLIP_SECONDS);
         const fallDur = Math.max(0.24, fallRemain * FALL_SECONDS);
@@ -377,12 +435,12 @@
 
       function goUp() {
         flipped = true;
-        moveTo(TOP_LOCAL_PX, 180, audioUp);
+        moveTo(TOP_LOCAL_PX, 180, "up");
       }
 
       function goDown() {
         flipped = false;
-        moveTo(getBottomLocalPx(), 0, audioDown);
+        moveTo(getBottomLocalPx(), 0, "down");
       }
 
       function toggleRoger() {
@@ -421,12 +479,8 @@
         setRogerRotation(0, isDesktopLike.matches);
         flipped = false;
 
-        // Unlock iOS audio
-        [audioUp, audioDown].forEach((a) => {
-          a.play()
-            .then(() => a.pause())
-            .catch(() => {});
-        });
+        primeAudioPool(audioPools.up);
+        primeAudioPool(audioPools.down);
 
         // Request gyroscope permission on iOS 13+
         if (
