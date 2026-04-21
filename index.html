@@ -237,75 +237,97 @@
       const tubeHint = document.getElementById("tubeHint");
       const audioUp = document.getElementById("audioUp");
       const audioDown = document.getElementById("audioDown");
+      const overlayMain = overlay.querySelector(".main");
+      const overlaySub = overlay.querySelector(".sub");
 
-      /* ── Audio durations ── */
-      let upDur = 0.9;
-      let downDur = 0.9;
-      audioUp.addEventListener("loadedmetadata", () => {
-        upDur = Math.max(0.3, audioUp.duration);
-      });
-      audioDown.addEventListener("loadedmetadata", () => {
-        downDur = Math.max(0.3, audioDown.duration);
-      });
-
-      function createAudioPool(template, size = 4) {
-        const src = template.currentSrc || template.src;
-        return {
-          index: 0,
-          items: Array.from({ length: size }, () => {
-            const audio = new Audio(src);
-            audio.preload = "auto";
-            audio.setAttribute("playsinline", "");
-            audio.load();
-            return audio;
-          }),
-        };
-      }
-
-      const audioPools = {
-        up: createAudioPool(audioUp),
-        down: createAudioPool(audioDown),
+      /* ── Audio ── */
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      let audioContext = null;
+      const soundBuffers = {
+        up: null,
+        down: null,
+      };
+      const soundDecodePromises = {
+        up: null,
+        down: null,
       };
 
-      function playFromPool(pool) {
-        const availableIndex = pool.items.findIndex(
-          (item) => item.paused || item.ended,
-        );
-        const nextIndex = availableIndex === -1 ? pool.index : availableIndex;
-        const audio = pool.items[nextIndex];
-
-        pool.index = (nextIndex + 1) % pool.items.length;
-
-        audio.pause();
-        try {
-          audio.currentTime = 0;
-        } catch {}
-
-        audio.play().catch(() => {
-          audio.load();
-        });
+      function fetchSoundFile(template) {
+        const src = template.currentSrc || template.src;
+        return fetch(src)
+          .then((response) => {
+            if (!response.ok) throw new Error(`Failed to load ${src}`);
+            return response.arrayBuffer();
+          })
+          .catch(() => null);
       }
 
-      function primeAudioPool(pool) {
-        pool.items.forEach((audio) => {
-          audio.muted = true;
-          try {
-            audio.currentTime = 0;
-          } catch {}
+      const soundFilePromises = {
+        up: fetchSoundFile(audioUp),
+        down: fetchSoundFile(audioDown),
+      };
 
-          audio
-            .play()
-            .then(() => {
-              audio.pause();
-              try {
-                audio.currentTime = 0;
-              } catch {}
-              audio.muted = false;
-            })
-            .catch(() => {
-              audio.muted = false;
-            });
-        });
+      function getAudioContext() {
+        if (!AudioContextClass) return null;
+        if (!audioContext) audioContext = new AudioContextClass();
+        return audioContext;
+      }
+
+      async function ensureAudioContextReady() {
+        const context = getAudioContext();
+        if (!context) return null;
+        if (context.state === "suspended") {
+          try {
+            await context.resume();
+          } catch {
+            return context;
+          }
+        }
+        return context;
+      }
+
+      async function ensureSoundBuffer(key) {
+        if (soundBuffers[key]) return soundBuffers[key];
+        if (soundDecodePromises[key]) return soundDecodePromises[key];
+
+        soundDecodePromises[key] = (async () => {
+          const context = await ensureAudioContextReady();
+          const audioData = await soundFilePromises[key];
+
+          if (!context || !audioData) return null;
+
+          try {
+            const buffer = await context.decodeAudioData(audioData.slice(0));
+            soundBuffers[key] = buffer;
+            return buffer;
+          } catch {
+            return null;
+          }
+        })();
+
+        const result = await soundDecodePromises[key];
+        soundDecodePromises[key] = null;
+        return result;
+      }
+
+      async function primeSoundBuffers() {
+        await Promise.allSettled([
+          ensureSoundBuffer("up"),
+          ensureSoundBuffer("down"),
+        ]);
+      }
+
+      async function playSound(key) {
+        const context = await ensureAudioContextReady();
+        if (!context) return;
+
+        const buffer = soundBuffers[key] || (await ensureSoundBuffer(key));
+        if (!buffer) return;
+
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        source.connect(context.destination);
+        source.start(0);
       }
 
       /* ── Constants ── */
@@ -412,7 +434,7 @@
           ),
         );
 
-        playFromPool(audioPools[soundKey]);
+        void playSound(soundKey);
 
         const tubeDur = Math.max(0.12, rotationRemain * TUBE_FLIP_SECONDS);
         const fallDur = Math.max(0.24, fallRemain * FALL_SECONDS);
@@ -468,7 +490,30 @@
       }
 
       /* ── Start on tap (required for iOS gyro + audio unlock) ── */
-      overlay.addEventListener("click", () => {
+      function requestOrientationAccess() {
+        if (
+          typeof DeviceOrientationEvent !== "undefined" &&
+          typeof DeviceOrientationEvent.requestPermission === "function"
+        ) {
+          return DeviceOrientationEvent.requestPermission()
+            .then((result) => result === "granted")
+            .catch(() => false);
+        }
+
+        return Promise.resolve(true);
+      }
+
+      overlay.addEventListener("click", async () => {
+        if (started) return;
+
+        overlay.style.pointerEvents = "none";
+        overlayMain.textContent = "Starting...";
+        overlaySub.textContent = "Loading sound and motion access.";
+
+        const orientationAccessPromise = requestOrientationAccess();
+        await ensureAudioContextReady();
+        await primeSoundBuffers();
+
         overlay.style.display = "none";
         started = true;
 
@@ -479,21 +524,7 @@
         setRogerRotation(0, isDesktopLike.matches);
         flipped = false;
 
-        primeAudioPool(audioPools.up);
-        primeAudioPool(audioPools.down);
-
-        // Request gyroscope permission on iOS 13+
-        if (
-          typeof DeviceOrientationEvent !== "undefined" &&
-          typeof DeviceOrientationEvent.requestPermission === "function"
-        ) {
-          DeviceOrientationEvent.requestPermission()
-            .then((r) => {
-              if (r === "granted")
-                window.addEventListener("deviceorientation", handleOrientation);
-            })
-            .catch(console.error);
-        } else {
+        if (await orientationAccessPromise) {
           window.addEventListener("deviceorientation", handleOrientation);
         }
       });
